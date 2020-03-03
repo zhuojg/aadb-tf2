@@ -1,17 +1,35 @@
 from initModel import ftRankLoss
 import numpy as np
-import tensorflow as tf
 import cv2
 import argparse
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
 
 
-# Size of images
-IMAGE_WIDTH = 227
-IMAGE_HEIGHT = 227
+class Score:
+    def __init__(self, model_data_path, mean_data_path):
+        # Get mean of AVA dataset
+        self.mean_img = np.fromfile(mean_data_path, sep=',', dtype=np.float32)
+        self.mean_img = np.reshape(self.mean_img, (256, 256, 3))
 
+        # Create a placeholder for the input image
+        self.input_node = tf.placeholder(tf.float32, shape=(None, 227, 227, 3))
 
-def image_preprocess(img_path):
-    pass
+        # Construct the network
+        self.net = ftRankLoss({'imgLow': self.input_node})
+        self.sess = tf.Session()
+
+        self.net.load(model_data_path, self.sess)
+
+    def score_one_image(self, img):
+        img = cv2.resize(img, (256, 256))
+        img = img - self.mean_img
+        img = cv2.resize(img, (227, 227))
+        img = img.reshape((-1, 227, 227, 3))
+
+        result = self.sess.run(self.net.get_output(), feed_dict={self.input_node: img})
+
+        return result
 
 
 def main():
@@ -42,7 +60,6 @@ def main():
         img = img - mean_img
         img = cv2.resize(img, (227, 227))
         img = img.reshape((-1, 227, 227, 3))
-        print(img.shape)
 
         # Perform a forward pass
         print('Scoring...')
